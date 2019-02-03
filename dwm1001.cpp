@@ -1,29 +1,27 @@
 #include "dwm1001.h"
 
-// Constructor
-DWM::DWM(): SPI_SETTINGS(SPI_RATE, MSBFIRST, SPI_MODE0){
+byte DATA_READY_ENABLED = 1;
+volatile byte DATA_READY_FLAG = 0;
+
+const int SPI_RATE = 1000000;
+SPISettings SPI_SETTINGS(SPI_RATE, MSBFIRST, SPI_MODE0);;
+uint32_t rxsize;
+uint8_t response[256];
+
+void DWM(){
     pinMode(SS, OUTPUT);
-    SPI.begin();
-    // EEPROM.get(0, DATA_READY_ENABLED);
-    // if(!DATA_READY_ENABLED){
-    //     Serial.println("IN HERE")
-    //     DATA_READY_ENABLED = ProcessReturnType(DWM_INT_CFG());
-    //     EEPROM.put(0, DATA_READY_ENABLED);
-    // }
-    
+    SPI.begin();    
 }
 
-DWM::~DWM(){}
-
 // SPI Processing
-void DWM::SPIWrite(uint8_t tlv[]=0){
+void SPIWrite(uint8_t tlv[]=0){
     uint8_t len = tlv[1] + 2;
     digitalWrite(SS, LOW);
     for(int i = 0; i < len; i++){tlv[i] = SPI.transfer(tlv[i]);}
     digitalWrite(SS, HIGH);
 }
 
-void DWM::SPIWaitForResponse(){
+void SPIWaitForResponse(){
     rxsize = 0x00;
     if(DATA_READY_ENABLED == 1){
         DATA_READY_FLAG = 0;
@@ -43,7 +41,7 @@ void DWM::SPIWaitForResponse(){
     }
 }
 
-void DWM::SPIGetReturnValue(){
+void SPIGetReturnValue(){
     response[0] = rxsize;
     if(DATA_READY_ENABLED == 1){
         while(!DATA_READY_FLAG);
@@ -59,7 +57,7 @@ void DWM::SPIGetReturnValue(){
 }
 
 // SPI Transaction Utils
-byte DWM::ProcessReturnType(uint8_t * response){
+byte ProcessReturnType(uint8_t * response){
     uint8_t resp_len = response[0];
     for(byte i=1; i<=resp_len; i++){
         
@@ -68,12 +66,12 @@ byte DWM::ProcessReturnType(uint8_t * response){
     return 1;
 }
 
-void DWM::DataReady(){
+void DataReady(){
     DATA_READY_FLAG = 1;
 }
 
 // DWM Genereal API Call
-uint8_t* DWM::TLVcmd(uint8_t tlv[]){  
+uint8_t* TLVcmd(uint8_t tlv[]){  
     SPI.beginTransaction(SPI_SETTINGS);
     SPIWrite(tlv);
     SPIWaitForResponse();
@@ -89,7 +87,7 @@ uint8_t* DWM::TLVcmd(uint8_t tlv[]){
 // - ALL arguments to an API call are uint8_t arrays or values
 // - IN this class, all API call responses' first byte is the total size of the array (not including the first byte)
 // - Google 'dwm1001 firmware api guide' for more info
-uint8_t* DWM::DWM_POS_SET(uint8_t val[]){
+uint8_t* DWM_POS_SET(uint8_t val[]){
     /*
     WRITES default position of the node (used in anchor mode but stored regardless).
     PARAMS: val[] is a 13-byte(32-bit, 32-bit, 32-bit, 8-bit) (uint8_t) array where:
@@ -105,7 +103,7 @@ uint8_t* DWM::DWM_POS_SET(uint8_t val[]){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_POS_GET(){
+uint8_t* DWM_POS_GET(){
     /*
     READS default position of the node (readable in anchor mode but stored regardless).
     PARAMS: N/A
@@ -120,7 +118,7 @@ uint8_t* DWM::DWM_POS_GET(){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_UPD_RATE_SET(uint8_t val[]){
+uint8_t* DWM_UPD_RATE_SET(uint8_t val[]){
     /*
     WRITES mobile update rate and stationary update rate in units of milliseconds.
     Stationary update rate must be >= mobile update rate.
@@ -133,7 +131,7 @@ uint8_t* DWM::DWM_UPD_RATE_SET(uint8_t val[]){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_UPD_RATE_GET(){
+uint8_t* DWM_UPD_RATE_GET(){
     /*
     READS mobile update rate and stationary update rate in units of milliseconds.
     PARAMS: N/A
@@ -146,7 +144,7 @@ uint8_t* DWM::DWM_UPD_RATE_GET(){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_CFG_TAG_SET(uint8_t val[]){
+uint8_t* DWM_CFG_TAG_SET(uint8_t val[]){
     /*
     WRITES tag configuration.
     CONFIGURES the node as a tag, user is advised to RESET the node to activate settings.
@@ -170,7 +168,7 @@ uint8_t* DWM::DWM_CFG_TAG_SET(uint8_t val[]){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_CFG_ANCHOR_SET(uint8_t val){
+uint8_t* DWM_CFG_ANCHOR_SET(uint8_t val){
     /*
     WRITES anchor configuration.
     CONFIGURES the node as an anchor, user is advised to RESET the node to activate settings.
@@ -190,7 +188,7 @@ uint8_t* DWM::DWM_CFG_ANCHOR_SET(uint8_t val){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_CFG_GET(){
+uint8_t* DWM_CFG_GET(){
     /*
     READS configuration of the node.
     PARAMS: N/A
@@ -219,7 +217,7 @@ uint8_t* DWM::DWM_CFG_GET(){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_SLEEP(){
+uint8_t* DWM_SLEEP(){
     /*
     CONFIGURES module into sleep mode, the module must have low power enabled otherwise there is an error.
     RETURN: Error code response({0x40, 0x01, 0x00} if no error)
@@ -228,7 +226,7 @@ uint8_t* DWM::DWM_SLEEP(){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_LOC_GET(){
+uint8_t* DWM_LOC_GET(){
     /*
     GET last distance to anchors(tag is currently ranging to) and their set positions.
     If location engine is enabled then the position of the tag is given.
@@ -240,7 +238,7 @@ uint8_t* DWM::DWM_LOC_GET(){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_BADDR_SET(uint8_t val[]){
+uint8_t* DWM_BADDR_SET(uint8_t val[]){
     /*
     WRITES the new public bluetooth address used by the device.
     The user is advised to reset the device after this command to make use of the changes.
@@ -252,7 +250,7 @@ uint8_t* DWM::DWM_BADDR_SET(uint8_t val[]){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_BADDR_GET(){
+uint8_t* DWM_BADDR_GET(){
     /*
     READS The bluetooth address currently being used by the device.
     PARAMS: N/A
@@ -264,7 +262,7 @@ uint8_t* DWM::DWM_BADDR_GET(){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_RESET(){
+uint8_t* DWM_RESET(){
     /*
     REBOOTS the module.
     RETURN: Error code response({0x40, 0x01, 0x00} if no error)
@@ -273,7 +271,7 @@ uint8_t* DWM::DWM_RESET(){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_VER_GET(){
+uint8_t* DWM_VER_GET(){
     /*
     READS the firmware version, configuration version, and hardware version of the module
     RETURN: important part of response is a total of 7-bytes(8-bit, 4 bytes, 4 bytes, 4 bytes) (uint8_t) where:
@@ -286,7 +284,7 @@ uint8_t* DWM::DWM_VER_GET(){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_GPIO_CFG_OUTPUT(uint8_t val[]){
+uint8_t* DWM_GPIO_CFG_OUTPUT(uint8_t val[]){
     /*
     CONFIGURES the selected gpio pin as an output (digital high or digital low).
     NOTE that gpios 22, 30, & 31 are utilized internally during the first few seconds of reboot.
@@ -300,7 +298,7 @@ uint8_t* DWM::DWM_GPIO_CFG_OUTPUT(uint8_t val[]){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_GPIO_CFG_INPUT(uint8_t val[]){
+uint8_t* DWM_GPIO_CFG_INPUT(uint8_t val[]){
     /*
     CONFIGURES the selected gpio pin as an input (no pull, pull-up, or pull-down).
     NOTE that gpios 22, 30, & 31 are utilized internally during the first few seconds of reboot.
@@ -314,7 +312,7 @@ uint8_t* DWM::DWM_GPIO_CFG_INPUT(uint8_t val[]){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_GPIO_VALUE_SET(uint8_t val[]){
+uint8_t* DWM_GPIO_VALUE_SET(uint8_t val[]){
     /*
     CONFIGURES the selected gpio pin output to high or low (pin should already be output, this API call just changes output value).
     PARAMS: val[] is a 2-byte (uint8_t, uint8_t) array where:
@@ -326,7 +324,7 @@ uint8_t* DWM::DWM_GPIO_VALUE_SET(uint8_t val[]){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_GPIO_VALUE_GET(uint8_t val){
+uint8_t* DWM_GPIO_VALUE_GET(uint8_t val){
     /*
     READS the selected gpio pin value.
     PARAMS: val is a 1-byte (uint8_t) value where:
@@ -339,7 +337,7 @@ uint8_t* DWM::DWM_GPIO_VALUE_GET(uint8_t val){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_GPIO_VALUE_TOGGLE(uint8_t val){
+uint8_t* DWM_GPIO_VALUE_TOGGLE(uint8_t val){
     /*
     TOGGLES the selected gpio pin output.
     PARAMS: val is a 1-byte (uint8_t) value where:
@@ -350,7 +348,7 @@ uint8_t* DWM::DWM_GPIO_VALUE_TOGGLE(uint8_t val){
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_STATUS_GET(){/*
+uint8_t* DWM_STATUS_GET(){/*
     READS the system status: Location Data Ready & Connected to UWB network
     RETURN: important part of response is a total of 2-bytes (uint8_t, uint8_t) where:
                 - byte 0 = total length of response (in this case 11, not including the first byte)
@@ -369,7 +367,7 @@ uint8_t* DWM::DWM_STATUS_GET(){/*
     TLVcmd(tlv);
     return response;
 }
-uint8_t* DWM::DWM_INT_CFG_GET(){
+uint8_t* DWM_INT_CFG_GET(){
     /*
     READS interrupt status for spi_data_ready and/or loc_ready?
     RETURN: important part of response is a total of 2-bytes (uint8_t, uint8_t) where:
@@ -383,7 +381,7 @@ uint8_t* DWM::DWM_INT_CFG_GET(){
     TLVcmd(tlv);
     return response;
 } 
-uint8_t* DWM::DWM_INT_CFG_SET(uint8_t val){ // Enables Data Ready Feature
+uint8_t* DWM_INT_CFG_SET(uint8_t val){ // Enables Data Ready Feature
     /*
     CONFIGURES interrupt for spi_data_ready and/or loc_ready.
     PARAMS: val is a 1-byte (uint8_t) value where:
